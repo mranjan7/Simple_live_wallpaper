@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+android:title="@string/clock_settings"
+android:key="clockwallpaper_settings">
+
+
+
+    <EditTextPreference android:title="@string/color_code_title"
+        android:key="color_code"
+        android:summary="@string/color_code_summary"></EditTextPreference>
+    <CheckBoxPreference android:title="@string/show_time_title"
+        android:defaultValue="true"
+        android:summary="@string/show_time_summary"
+        android:key="show_time" />
+    <CheckBoxPreference android:title="@string/show_day_title"
+        android:defaultValue="true"
+        android:summary="@string/show_day_summary"
+        android:key="show_day" />
+    <CheckBoxPreference android:title="@string/show_date_title"
+        android:defaultValue="true"
+        android:summary="@string/show_date_summary"
+        android:key="show_date" />
+    <CheckBoxPreference android:title="@string/show_location_title"
+        android:defaultValue="true"
+        android:summary="@string/show_location_summary"
+        android:key="show_location" />
+
+
+</PreferenceScreen>
