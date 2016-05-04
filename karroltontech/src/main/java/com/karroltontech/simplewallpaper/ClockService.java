@@ -2,6 +2,7 @@ package com.karroltontech.simplewallpaper;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -90,6 +91,10 @@ public class ClockService extends WallpaperService implements
     private int[] imageIds;
     private String symbolText;
     private Weatherdata weatherdata;
+    private boolean locationWeatherDisplayed;
+    private boolean mShowLocation;
+    private boolean isLocationWeatherDataSetUp;
+    private boolean  isOnTouchEventCompleted;
 
 
     @Override
@@ -118,7 +123,7 @@ public class ClockService extends WallpaperService implements
         }
         locationRequestTime = SystemClock.elapsedRealtime();
 
-        Log.d(TAG,"google api client connected"+mGoogleApiClient.isConnected());
+        Log.d(TAG, "google api client connected" + mGoogleApiClient.isConnected());
         if (mGoogleApiClient.isConnected()) {
             mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
                     mGoogleApiClient);
@@ -168,9 +173,8 @@ public class ClockService extends WallpaperService implements
 
     @Override
     public void onConnected(Bundle bundle) {
-
-        getLocation();
-
+        Log.d(TAG,"On connected "+bundle);
+    setUpLocationAndWeatherData();
 
     }
 
@@ -188,11 +192,99 @@ public class ClockService extends WallpaperService implements
     @Override
     public void onLocationChanged(Location location) {
 
+        Log.d(TAG,"On location changed "+location);
+
+        isLocationWeatherDataSetUp=false;
         mLastLocation = location;
-        mLatitude = mLastLocation.getLatitude();
-        mLongitude = mLastLocation.getLongitude();
+        if(getAddressFromGeocoder()&&getTemperatureAndSymbol())
+        {
+            isLocationWeatherDataSetUp=true;
+        }
 
 
+
+    }
+
+    private void setUpLocationAndWeatherData() {
+
+        if (getLocation()&&getAddressFromGeocoder()&&getTemperatureAndSymbol()) {
+
+            isLocationWeatherDataSetUp=true;
+
+        }
+    }
+    private boolean getTemperatureAndSymbol() {
+        try {
+            XmlPullParser xmlPullParser = Xml.newPullParser();
+            xmlPullParser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
+            xmlPullParser.setInput(new StringReader(jsonResponse));
+            int event;
+            String text = null;
+            event = xmlPullParser.getEventType();
+            boolean temperatureObtained = false;
+            boolean symbolObtained = false;
+            outer:
+            while (event != XmlPullParser.END_DOCUMENT) {
+                String name = xmlPullParser.getName();
+
+                //System.out.println("name : "+name);
+                switch (event) {
+                    case XmlPullParser.START_TAG:
+                        break;
+                    case XmlPullParser.TEXT:
+                        if ("temperature".equals(name)) {
+                            text = xmlPullParser.getAttributeValue(null, "value");
+                        } else if (name != null) {
+                            text = xmlPullParser.getAttributeValue(0);
+                        }
+                        break;
+                    case XmlPullParser.END_TAG:
+                        //System.out.println("text"+text);
+                        if (name.equals("temperature")) {
+                            //System.out.println("temperature"+xmlPullParser.getAttributeValue(null,"value"));
+                            temperature = xmlPullParser.getAttributeValue(null, "value");
+                            //System.out.println(xmlPullParser);
+                            temperatureObtained = true;
+
+                        } else if (name.equals("symbol")) {
+
+                            symbolNumber = xmlPullParser.getAttributeValue(null, "number");
+                            symbolText = xmlPullParser.getAttributeValue(null, "id");
+                            symbolObtained = true;
+
+                        }
+                        break;
+
+                }
+                if (temperatureObtained && symbolObtained) {
+                    break outer;
+                }
+                event = xmlPullParser.next();
+            }
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    private boolean getAddressFromGeocoder() {
+        try {
+
+            mAddresses = mGeocoder.getFromLocation(mLatitude,
+                    mLongitude,
+                    1);
+            //System.out.println(mAddresses);
+            return true;
+
+        } catch (IOException ioException) {
+            ioException.printStackTrace();
+            return false;
+
+        } catch (IllegalArgumentException illegalArgumentException) {
+            illegalArgumentException.printStackTrace();
+            return false;
+
+        }
     }
 
 
@@ -221,9 +313,9 @@ public class ClockService extends WallpaperService implements
         private boolean mShowDate;
         private boolean mShowTime;
         private boolean mShowDay;
-        private boolean mShowLocation;
+
         private GestureDetector gestureDetector1;
-        private boolean locationWeatherDisplayed;
+
 
 
         ClockEngine() {
@@ -248,6 +340,7 @@ public class ClockService extends WallpaperService implements
             gestureDetector1 = new GestureDetector(new GestureDetector.SimpleOnGestureListener() {
                 @Override
                 public boolean onSingleTapConfirmed(MotionEvent e) {
+                    Log.d(TAG,"On Single tap Confirmed "+e);
                     if (e.getAction() == MotionEvent.ACTION_MOVE) {
                         mTouchX = e.getX();
                         mTouchY = e.getY();
@@ -265,9 +358,21 @@ public class ClockService extends WallpaperService implements
 
                 @Override
                 public boolean onDoubleTap(MotionEvent e) {
-                    //System.out.println("onDoubleTap"+ e.toString());
-                    //handle double tap
-                    return true;
+                    Log.d(TAG,"On Double tap Confirmed "+e);
+                    startSettings();
+                    return super.onDoubleTap(e);
+                }
+
+                @Override
+                public boolean onDoubleTapEvent(MotionEvent e) {
+                    Log.d(TAG,"On Double tap event "+e);
+                    return super.onDoubleTapEvent(e);
+                }
+
+                @Override
+                public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                    Log.d(TAG,"On fling event ");
+                    return super.onFling(e1, e2, velocityX, velocityY);
                 }
             });
         }
@@ -325,26 +430,21 @@ public class ClockService extends WallpaperService implements
          */
         @Override
         public void onTouchEvent(MotionEvent event) {
-           // mTouchX = event.getX();
-            //mTouchY = event.getY();
-           /* if (event.getAction() == MotionEvent.ACTION_MOVE) {
-                mTouchX = event.getX();
-                mTouchY = event.getY();
-            } else {
-                mTouchX = -1;
-                mTouchY = -1;
-            }*/
             super.onTouchEvent(event);
 
             gestureDetector1.onTouchEvent(event);
             Log.d(TAG, "On touch event" + event);
-            mGoogleApiClient.connect();
-            if (getLocation()) {
-                mShowLocation = true;
+            isOnTouchEventCompleted=false;
+            if(!mGoogleApiClient.isConnected()) {
+                mGoogleApiClient.connect();
             }
+
+            setUpLocationAndWeatherData();
 
 
         }
+
+
 
         /*
          * Draw one frame of the animation. This method gets called repeatedly
@@ -365,7 +465,13 @@ public class ClockService extends WallpaperService implements
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
-                if (c != null) holder.unlockCanvasAndPost(c);
+                try {
+                    if (c != null) holder.unlockCanvasAndPost(c);
+                }
+                catch(Exception e)
+                {
+                    e.printStackTrace();
+                }
             }
 
             // Reschedule the next redraw
@@ -402,19 +508,34 @@ public class ClockService extends WallpaperService implements
             }
             if (mShowLocation) {
 
-                ySize = drawLocation(c, paint, ySize, padding);
+                if(!isOnTouchEventCompleted) {
+                    if (isLocationWeatherDataSetUp) {
+                        ySize = drawLocation(c, paint, ySize, padding);
 
-                drawTemperatureAndWeather(c, paint, ySize, padding, imageSpace);
+                        drawTemperatureAndWeather(c, paint, ySize, padding, imageSpace);
+                    } else {
+                        drawProgress(c, ySize, padding, paint);
+
+                    }
+                }
 
 
             }
             c.restore();
-            if (SystemClock.elapsedRealtime() - locationRequestTime > 10000) {
+            if (!isOnTouchEventCompleted&&SystemClock.elapsedRealtime() - locationRequestTime > 10000) {
                 removeLocationUpadtesAndDisconnect();
-                mShowLocation = false;
-                mLastLocation=null;
+                isLocationWeatherDataSetUp=false;
+                isOnTouchEventCompleted=true;
 
             }
+        }
+
+        private void drawProgress(Canvas c, int ySize, int padding, Paint paint) {
+            int locationFontSize = getResources().getDimensionPixelSize(R.dimen.locationFontSize);
+            paint.setTextSize(locationFontSize);
+            ySize = ySize + locationFontSize;
+            ySize = ySize + padding;
+            c.drawText("Gettting location and weather ....", 0, ySize, paint);
         }
 
         @NonNull
@@ -454,7 +575,7 @@ public class ClockService extends WallpaperService implements
             Request request = new Request.Builder().url("http://api.met.no/weatherapi/locationforecastlts/1.2/?lat=" + latitude + ";lon=" + longitude).build();
             if (isNetworkAvailable()) {
                 if (call == null ) {
-                    if(!locationWeatherDisplayed) {
+
                         call = okHttpClient.newCall(request);
                         call.enqueue(new Callback() {
                             @Override
@@ -478,16 +599,13 @@ public class ClockService extends WallpaperService implements
 
                             }
                         });
-                    }
+
                 }
 
-                if(locationWeatherDisplayed) {
+
                     drawTemperatureWeatherOnCanvas(c, paint, ySize, padding, imageSpace);
-                }
-                else
-                {
-                    //drawTouchPoint(c);
-                }
+
+
 
             } else {
                 Toast.makeText(getApplicationContext(), "Network is not available !", Toast.LENGTH_LONG).show();
@@ -539,9 +657,7 @@ public class ClockService extends WallpaperService implements
         }
 
         private int drawLocation(Canvas c, Paint paint, int ySize, int padding) {
-            if (!locationWeatherDisplayed) {
-                getAddressFromGeocoder();
-            }
+
             int locationFontSize = getResources().getDimensionPixelSize(R.dimen.locationFontSize);
             paint.setTextSize(locationFontSize);
             ySize = ySize + locationFontSize;
@@ -605,77 +721,9 @@ public class ClockService extends WallpaperService implements
             return ySize;
         }
 
-        private void getTemperatureAndSymbol() {
-            try {
-                XmlPullParser xmlPullParser = Xml.newPullParser();
-                xmlPullParser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
-                xmlPullParser.setInput(new StringReader(jsonResponse));
-                //  xmlPullParser.nextTag();
-                //xmlPullParser.require(XmlPullParser.START_TAG,null,"weatherdata");
-                int event;
-                String text = null;
-                event = xmlPullParser.getEventType();
-                boolean temperatureObtained = false;
-                boolean symbolObtained = false;
-                outer:
-                while (event != XmlPullParser.END_DOCUMENT) {
-                    String name = xmlPullParser.getName();
 
-                    //System.out.println("name : "+name);
-                    switch (event) {
-                        case XmlPullParser.START_TAG:
-                            break;
-                        case XmlPullParser.TEXT:
-                            if ("temperature".equals(name)) {
-                                text = xmlPullParser.getAttributeValue(null, "value");
-                            } else if (name != null) {
-                                text = xmlPullParser.getAttributeValue(0);
-                            }
-                            break;
-                        case XmlPullParser.END_TAG:
-                            //System.out.println("text"+text);
-                            if (name.equals("temperature")) {
-                                //System.out.println("temperature"+xmlPullParser.getAttributeValue(null,"value"));
-                                temperature = xmlPullParser.getAttributeValue(null, "value");
-                                //System.out.println(xmlPullParser);
-                                temperatureObtained = true;
 
-                            } else if (name.equals("symbol")) {
 
-                                symbolNumber = xmlPullParser.getAttributeValue(null, "number");
-                                symbolText = xmlPullParser.getAttributeValue(null, "id");
-                                symbolObtained = true;
-
-                            }
-                            break;
-
-                    }
-                    if (temperatureObtained && symbolObtained) {
-                        break outer;
-                    }
-                    event = xmlPullParser.next();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        private void getAddressFromGeocoder() {
-            try {
-
-                mAddresses = mGeocoder.getFromLocation(mLatitude,
-                        mLongitude,
-                        1);
-                //System.out.println(mAddresses);
-
-            } catch (IOException ioException) {
-                ioException.printStackTrace();
-
-            } catch (IllegalArgumentException illegalArgumentException) {
-                illegalArgumentException.printStackTrace();
-
-            }
-        }
 
         private void skip(XmlPullParser parser) throws XmlPullParserException, IOException {
             if (parser.getEventType() != XmlPullParser.START_TAG) {
@@ -699,7 +747,7 @@ public class ClockService extends WallpaperService implements
          * Draw a circle around the current touch point, if any.
          */
         void drawTouchPoint(Canvas c) {
-            Log.d(TAG,"x "+mTouchX+" y "+mTouchY);
+            //Log.d(TAG,"x "+mTouchX+" y "+mTouchY);
             if (mTouchX >= 0 && mTouchY >= 0) {
 
                 c.drawCircle(mTouchX, mTouchY, 80, mPaint);
@@ -722,6 +770,12 @@ public class ClockService extends WallpaperService implements
 
 
         }
+    }
+
+    private void startSettings() {
+        Intent intent=new Intent(this,ClockServiceSettings.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
     }
 
     private boolean isNetworkAvailable() {
