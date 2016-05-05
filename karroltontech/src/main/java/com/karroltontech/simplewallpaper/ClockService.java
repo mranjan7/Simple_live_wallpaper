@@ -273,7 +273,7 @@ public class ClockService extends WallpaperService implements
             mAddresses = mGeocoder.getFromLocation(mLatitude,
                     mLongitude,
                     1);
-            //System.out.println(mAddresses);
+            Log.d(TAG,"mAddress"+mAddresses);
             return true;
 
         } catch (IOException ioException) {
@@ -315,7 +315,7 @@ public class ClockService extends WallpaperService implements
         private boolean mShowDay;
 
         private GestureDetector gestureDetector1;
-
+        private long mLastTouchTime;
 
 
         ClockEngine() {
@@ -434,16 +434,22 @@ public class ClockService extends WallpaperService implements
 
             gestureDetector1.onTouchEvent(event);
             Log.d(TAG, "On touch event" + event);
+
+                setUpAndDraw();
+
+
+
+
+        }
+
+        private void setUpAndDraw() {
             isOnTouchEventCompleted=false;
             if(!mGoogleApiClient.isConnected()) {
                 mGoogleApiClient.connect();
             }
 
             setUpLocationAndWeatherData();
-
-
         }
-
 
 
         /*
