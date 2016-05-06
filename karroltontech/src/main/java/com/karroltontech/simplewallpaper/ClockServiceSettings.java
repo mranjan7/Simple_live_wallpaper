@@ -42,5 +42,12 @@ public class ClockServiceSettings extends PreferenceActivity
 
 
     }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        finish();
+
+    }
 }
 
