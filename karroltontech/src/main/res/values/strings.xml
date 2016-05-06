@@ -24,22 +24,18 @@
     <string name="wallpapers">Simple Live Wallpaper</string>
 
 
-    <string name="wallpaper_clock">Simple Wallpaper</string>
+    <string name="wallpaper_clock">Simple Live Wallpaper</string>
 
 
     <string name="clock_settings">Settings</string>
-    <string name="clock_settings_title">Select color</string>
-    <string name="clock_settings_summary">Choose the background color for wallpaper</string>
-    <string name="color_code_title">Specify color code for background</string>
-    <string name="color_code_summary">i.e #00FFFF(Type D for going back to default)</string>
-    <string name="color_code_text_title">Specify color code for text</string>
-    <string name="color_code_text_summary">i.e #00FFFF(Type D for going back to default)</string>
+    <string name="color_code_title">Color code for background</string>
+    <string name="color_code_text_title">Color code for text</string>
     <string name="show_time_title">Show time</string>
     <string name="show_time_summary">Check this if you want to show time on the wallpaper</string>
     <string name="show_day_title">Show day</string>
     <string name="show_day_summary">Check this if you want to show day on the wallpaper</string>
     <string name="show_date_title">Show date</string>
     <string name="show_date_summary">Check this if you want to show date on the wallpaper</string>
-    <string name="show_location_title">Show location</string>
-    <string name="show_location_summary">Check this if you want to show location on the wallpaper</string>
+    <string name="show_location_title">Show location and weather</string>
+    <string name="show_location_summary">Check this if you want to show location and weather on the wallpaper</string>
 </resources>
