@@ -1,19 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
 
-    <string-array name="clock_colors">
-        <item>"Red"</item>
-        <item>"Blue"</item>
-        <item>"Green"</item>
-        <item>"Default"</item>
-    </string-array>
-
-    <string-array name="color_values">
-        <item>"-65536"</item>
-        <item>"-16776961"</item>
-        <item>"-16711936"</item>
-        <item>"Default"</item>
-    </string-array>
-
 
 </resources>
