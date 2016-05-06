@@ -8,7 +8,6 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.location.Address;
 import android.location.Geocoder;
@@ -16,9 +15,7 @@ import android.location.Location;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
-import android.os.StatFs;
 import android.os.SystemClock;
 import android.service.wallpaper.WallpaperService;
 import android.support.annotation.NonNull;
@@ -81,8 +78,6 @@ public class ClockService extends WallpaperService implements
     private Call call;
     private String jsonResponse = "";
     private Weather weather;
-
-    private final String APIKEY = "b2d4e8eee887a2cfe272b08961570107";
     List<Address> mAddresses;
     private long locationRequestTime;
     private HashMap<String, String> textMap;
@@ -305,8 +300,8 @@ public class ClockService extends WallpaperService implements
         };
         private boolean mVisible;
         private String mColor;
-        private String mColorCode;
-        private String mColorCodeText;
+        private int mColorCode;
+        private int mColorCodeText;
         private SharedPreferences mPrefs;
         private float mWidth;
         private float mHeight;
@@ -341,18 +336,7 @@ public class ClockService extends WallpaperService implements
                 @Override
                 public boolean onSingleTapConfirmed(MotionEvent e) {
                     Log.d(TAG,"On Single tap Confirmed "+e);
-                    if (e.getAction() == MotionEvent.ACTION_MOVE) {
-                        mTouchX = e.getX();
-                        mTouchY = e.getY();
-                    } else {
-                        mTouchX = -1;
-                        mTouchY = -1;
-                    }
-
-                    mGoogleApiClient.connect();
-                    if (getLocation()) {
-                        mShowLocation = true;
-                    }
+                    setUpAndDraw();
                     return super.onSingleTapConfirmed(e);
                 }
 
@@ -546,21 +530,26 @@ public class ClockService extends WallpaperService implements
 
         @NonNull
         private Paint setUpPaint(Canvas c) {
+            Log.d(TAG,"color code "+mColorCode);
+            Log.d(TAG,"color code text "+mColorCodeText);
             Paint paint = new Paint();
-            if (mColorCode == null || "Default".equals(mColorCode) || "D".equalsIgnoreCase(mColorCode)) {
-                paint.setColor(Color.rgb(255, 160, 122));
-            } else {
-                paint.setColor(Color.parseColor(mColorCode));
-            }
+//            if (mColorCode == null || "Default".equals(mColorCode) || "D".equalsIgnoreCase(mColorCode)) {
+//                paint.setColor(Color.rgb(255, 160, 122));
+//            } else {
+//                paint.setColor(Color.parseColor(mColorCode));
+//            }
+            paint.setColor(mColorCode);
             paint.setStyle(Paint.Style.FILL);
 
             c.drawPaint(paint);
 
-            if (mColorCodeText == null || "Default".equals(mColorCodeText) || "D".equalsIgnoreCase(mColorCodeText)) {
-                paint.setColor(Color.WHITE);
-            } else {
-                paint.setColor(Color.parseColor(mColorCodeText));
-            }
+//            if (mColorCodeText == null || "Default".equals(mColorCodeText) || "D".equalsIgnoreCase(mColorCodeText)) {
+//                paint.setColor(Color.WHITE);
+//            } else {
+//                paint.setColor(Color.parseColor(mColorCodeText));
+//            }
+
+            paint.setColor(mColorCodeText);
 
 
             paint.setTextAlign(Paint.Align.LEFT);
@@ -763,16 +752,15 @@ public class ClockService extends WallpaperService implements
         @Override
         public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String s) {
 
-            String color = sharedPreferences.getString("clock_color", "Default");
-            mColor = color;
-            String colorCode = sharedPreferences.getString("color_code", "Default");
+            Log.d(TAG,sharedPreferences.getAll().toString());
+            int colorCode = sharedPreferences.getInt("color_code",0xffffa07a);
             mColorCode = colorCode;
-            String colorCodeText = sharedPreferences.getString("color_code_text", "Default");
+            int colorCodeText = sharedPreferences.getInt("color_code_text", 0xffffffff);
             mColorCodeText = colorCodeText;
             mShowDate = sharedPreferences.getBoolean("show_date", true);
             mShowTime = sharedPreferences.getBoolean("show_time", true);
             mShowDay = sharedPreferences.getBoolean("show_day", true);
-            //mShowLocation=sharedPreferences.getBoolean("show_location",true);
+            mShowLocation=sharedPreferences.getBoolean("show_location",true);
 
 
         }
