@@ -1,10 +1,12 @@
 package com.karroltontech.simplewallpaper;
 
 import android.Manifest;
+import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -23,6 +25,7 @@ import android.support.v4.app.ActivityCompat;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Xml;
 import android.view.GestureDetector;
@@ -83,13 +86,26 @@ public class ClockService extends WallpaperService implements
     private HashMap<String, String> textMap;
     private String temperature;
     private String symbolNumber;
+    private String humidity;
+    boolean temperatureObtained = false;
+    boolean symbolObtained = false;
+    boolean humidityObtained = false;
     private int[] imageIds;
     private String symbolText;
+    private String nextHourSymbolText;
+    private String nextHourSymbolNumber;
+    private boolean nextHourSymbolObtained;
     private Weatherdata weatherdata;
     private boolean locationWeatherDisplayed;
     private boolean mShowLocation;
     private boolean isLocationWeatherDataSetUp;
-    private boolean  isOnTouchEventCompleted;
+    private boolean isOnTouchEventCompleted;
+    private boolean isEverythingDisplayed;
+    private boolean isOnTouchEventStarted;
+    private int width;
+    private int height;
+    private boolean toDrawSettings;
+
 
 
     @Override
@@ -116,13 +132,13 @@ public class ClockService extends WallpaperService implements
 
             return false;
         }
-        locationRequestTime = SystemClock.elapsedRealtime();
 
-        Log.d(TAG, "google api client connected" + mGoogleApiClient.isConnected());
+
+        //Log.d(TAG, "google api client connected" + mGoogleApiClient.isConnected());
         if (mGoogleApiClient.isConnected()) {
             mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
                     mGoogleApiClient);
-            Log.d(TAG,"mLastlocation"+mLastLocation);
+            //Log.d(TAG,"mLastlocation"+mLastLocation);
 
             if (mLastLocation == null) {
                 createLocationRequest();
@@ -148,10 +164,13 @@ public class ClockService extends WallpaperService implements
     }
 
     private void removeLocationUpadtesAndDisconnect() {
-        if(mGoogleApiClient.isConnected()) {
+        if (mGoogleApiClient.isConnected()) {
             LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
             mGoogleApiClient.disconnect();
         }
+        okHttpClient.connectionPool().evictAll();
+
+
     }
 
 
@@ -168,8 +187,8 @@ public class ClockService extends WallpaperService implements
 
     @Override
     public void onConnected(Bundle bundle) {
-        Log.d(TAG,"On connected "+bundle);
-    setUpLocationAndWeatherData();
+        //Log.d(TAG,"On connected "+bundle);
+        setUpLocationAndWeatherData();
 
     }
 
@@ -187,44 +206,84 @@ public class ClockService extends WallpaperService implements
     @Override
     public void onLocationChanged(Location location) {
 
-        Log.d(TAG,"On location changed "+location);
+        //Log.d(TAG,"On location changed "+location);
 
-        isLocationWeatherDataSetUp=false;
+        isLocationWeatherDataSetUp = false;
         mLastLocation = location;
-        if(getAddressFromGeocoder()&&getTemperatureAndSymbol())
-        {
-            isLocationWeatherDataSetUp=true;
+        if (getAddressFromGeocoder() && getTemperatureAndSymbol()) {
+            isLocationWeatherDataSetUp = true;
         }
-
+        removeLocationUpadtesAndDisconnect();
 
 
     }
 
     private void setUpLocationAndWeatherData() {
 
-        if (getLocation()&&getAddressFromGeocoder()&&getTemperatureAndSymbol()) {
+        if (getLocation() && getAddressFromGeocoder() && getTemperatureAndSymbol()) {
 
-            isLocationWeatherDataSetUp=true;
+            isLocationWeatherDataSetUp = true;
+            removeLocationUpadtesAndDisconnect();
 
         }
     }
+
     private boolean getTemperatureAndSymbol() {
         try {
             XmlPullParser xmlPullParser = Xml.newPullParser();
             xmlPullParser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
             xmlPullParser.setInput(new StringReader(jsonResponse));
+            Log.d(TAG, jsonResponse);
             int event;
             String text = null;
             event = xmlPullParser.getEventType();
-            boolean temperatureObtained = false;
-            boolean symbolObtained = false;
+            int hour = -1;
+            String fromTime;
+            String toTime;
+
+            boolean hourlyWeatherObtained = false;
+            boolean dailyWeatherObtained = false;
+            boolean isNextHourTime=false;
+            boolean isTomorrowTime=false;
+
             outer:
             while (event != XmlPullParser.END_DOCUMENT) {
                 String name = xmlPullParser.getName();
 
-                //System.out.println("name : "+name);
+
+
+                //Log.d(TAG, "name : " + name + " event : " + event);
                 switch (event) {
                     case XmlPullParser.START_TAG:
+                        if (name.equals("time")) {
+
+                            fromTime = xmlPullParser.getAttributeValue(null, "from");
+                            toTime = xmlPullParser.getAttributeValue(null, "to");
+                            Log.d(TAG, "count " + xmlPullParser.getAttributeCount());
+                            Log.d(TAG, "fromTime " + fromTime);
+                            String fromHourSt = fromTime.substring(fromTime.indexOf('T') + 1, fromTime.indexOf(':'));
+                            String toHourSt = toTime.substring(toTime.indexOf('T') + 1, toTime.indexOf(':'));
+                            Log.d(TAG, "fromHourSt " + fromHourSt);
+
+                            int tempFromHour=Integer.parseInt(fromHourSt);
+                            int tempToHour=Integer.parseInt(toHourSt);
+                            Log.d(TAG, "tempFromHour " + tempFromHour);
+                            Log.d(TAG, "tempToHour " + tempToHour);
+                            if(hour!=-1&&hour<23&&tempFromHour==hour+1&&tempToHour==hour+1)
+                            {
+                                isNextHourTime=true;
+                            }
+
+
+
+
+                            if (hour == -1) {
+                                hour = Integer.parseInt(fromHourSt);
+                            }
+
+
+
+                        }
                         break;
                     case XmlPullParser.TEXT:
                         if ("temperature".equals(name)) {
@@ -239,19 +298,46 @@ public class ClockService extends WallpaperService implements
                             //System.out.println("temperature"+xmlPullParser.getAttributeValue(null,"value"));
                             temperature = xmlPullParser.getAttributeValue(null, "value");
                             //System.out.println(xmlPullParser);
-                            temperatureObtained = true;
+                            if (temperature != null) {
+                                temperatureObtained = true;
+                            }
 
                         } else if (name.equals("symbol")) {
 
-                            symbolNumber = xmlPullParser.getAttributeValue(null, "number");
-                            symbolText = xmlPullParser.getAttributeValue(null, "id");
-                            symbolObtained = true;
+                            if(symbolNumber==null&&symbolText==null) {
+
+                                symbolNumber = xmlPullParser.getAttributeValue(null, "number");
+                                symbolText = xmlPullParser.getAttributeValue(null, "id");
+                                if (symbolNumber != null && symbolText != null) {
+                                    symbolObtained = true;
+                                }
+                            }
+                            else if(isNextHourTime)
+                            {
+                                nextHourSymbolNumber=xmlPullParser.getAttributeValue(null, "number");
+                                nextHourSymbolText=xmlPullParser.getAttributeValue(null, "id");
+                                if(nextHourSymbolText!=null&&nextHourSymbolNumber!=null)
+                                {
+                                    nextHourSymbolObtained=true;
+                                }
+                                isNextHourTime=false;
+                            }
+
+                        } else if (name.equals("humidity")) {
+
+                            humidity = xmlPullParser.getAttributeValue(null, "value");
+
+                            if (humidity != null) {
+                                humidityObtained = true;
+
+                            }
 
                         }
                         break;
 
                 }
-                if (temperatureObtained && symbolObtained) {
+                if (temperatureObtained && symbolObtained && humidityObtained &&nextHourSymbolObtained) {
+                    Log.d(TAG, "nextHourSymbol " + nextHourSymbolNumber);
                     break outer;
                 }
                 event = xmlPullParser.next();
@@ -262,17 +348,19 @@ public class ClockService extends WallpaperService implements
             return false;
         }
     }
+
     private boolean getAddressFromGeocoder() {
         try {
 
             mAddresses = mGeocoder.getFromLocation(mLatitude,
                     mLongitude,
                     1);
-            Log.d(TAG,"mAddress"+mAddresses);
+            //Log.d(TAG,"mAddress"+mAddresses);
             return true;
 
         } catch (IOException ioException) {
             ioException.printStackTrace();
+            //Toast.makeText(getApplicationContext(), "Could not get location. Please check if internet connection is available.", Toast.LENGTH_LONG).show();
             return false;
 
         } catch (IllegalArgumentException illegalArgumentException) {
@@ -289,9 +377,6 @@ public class ClockService extends WallpaperService implements
         private float mOffset;
         private float mTouchX = -1;
         private float mTouchY = -1;
-        private long mStartTime;
-        private float mCenterX;
-        private float mCenterY;
 
         private final Runnable mDrawWallpaper = new Runnable() {
             public void run() {
@@ -315,7 +400,7 @@ public class ClockService extends WallpaperService implements
 
         ClockEngine() {
 
-            mStartTime = SystemClock.elapsedRealtime();
+
             mPrefs = ClockService.this.getSharedPreferences(SHARED_PREFS_NAME, 0);
             mPrefs.registerOnSharedPreferenceChangeListener(this);
             onSharedPreferenceChanged(mPrefs, null);
@@ -335,27 +420,27 @@ public class ClockService extends WallpaperService implements
             gestureDetector1 = new GestureDetector(new GestureDetector.SimpleOnGestureListener() {
                 @Override
                 public boolean onSingleTapConfirmed(MotionEvent e) {
-                    Log.d(TAG,"On Single tap Confirmed "+e);
+                    //Log.d(TAG,"On Single tap Confirmed "+e);
                     setUpAndDraw();
                     return super.onSingleTapConfirmed(e);
                 }
 
                 @Override
                 public boolean onDoubleTap(MotionEvent e) {
-                    Log.d(TAG,"On Double tap Confirmed "+e);
+                    //Log.d(TAG,"On Double tap Confirmed "+e);
                     startSettings();
                     return super.onDoubleTap(e);
                 }
 
                 @Override
                 public boolean onDoubleTapEvent(MotionEvent e) {
-                    Log.d(TAG,"On Double tap event "+e);
+                    //Log.d(TAG,"On Double tap event "+e);
                     return super.onDoubleTapEvent(e);
                 }
 
                 @Override
                 public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-                    Log.d(TAG,"On fling event ");
+                    //Log.d(TAG,"On fling event ");
                     return super.onFling(e1, e2, velocityX, velocityY);
                 }
             });
@@ -382,11 +467,9 @@ public class ClockService extends WallpaperService implements
         @Override
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
-            // store the center of the surface, so we can draw the cube in the right spot
-            mCenterX = width / 2.0f;
-            mCenterY = height / 2.0f;
-            mWidth = width;
-            mHeight = height;
+            ClockService.this.width=width;
+            ClockService.this.height=height;
+
             drawFrame();
         }
 
@@ -417,34 +500,49 @@ public class ClockService extends WallpaperService implements
             super.onTouchEvent(event);
 
             gestureDetector1.onTouchEvent(event);
-            Log.d(TAG, "On touch event" + event);
+            //Log.d(TAG, "On touch event" + event);
 
-                setUpAndDraw();
+            double x=event.getX();
+            double y=event.getY();
 
+            if((int)x>(int)(width*0.8))
+            {
+                toDrawSettings=true;
+            }
 
+            setUpAndDraw();
 
 
         }
 
+        private void drawSettings() {
+
+        }
+
         private void setUpAndDraw() {
-            isOnTouchEventCompleted=false;
-            if(!mGoogleApiClient.isConnected()) {
+            isOnTouchEventStarted = true;
+            isOnTouchEventCompleted = false;
+            isEverythingDisplayed = false;
+            locationRequestTime = 0;
+            if (!mGoogleApiClient.isConnected()) {
                 mGoogleApiClient.connect();
             }
 
             setUpLocationAndWeatherData();
+
         }
 
 
         /*
          * Draw one frame of the animation. This method gets called repeatedly
          * by posting a delayed Runnable. You can do any drawing you want in
-         * here. This example draws a wireframe cube.
+         * here.
          */
         void drawFrame() {
             final SurfaceHolder holder = getSurfaceHolder();
-
             Canvas c = null;
+
+
             try {
                 c = holder.lockCanvas();
                 if (c != null) {
@@ -457,9 +555,7 @@ public class ClockService extends WallpaperService implements
             } finally {
                 try {
                     if (c != null) holder.unlockCanvasAndPost(c);
-                }
-                catch(Exception e)
-                {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
@@ -471,20 +567,36 @@ public class ClockService extends WallpaperService implements
             }
         }
 
-        /*
-         * Draw a wireframe cube by drawing 12 3 dimensional lines between
-         * adjacent corners of the cube
-         */
+
         void drawWallpaper(Canvas c) {
             c.save();
+
             int ySize = 0;
             int initialPadding = getResources().getDimensionPixelSize(R.dimen.initialPadding);
             int padding = getResources().getDimensionPixelSize(R.dimen.padding);
             int imageSpace = getResources().getDimensionPixelSize(R.dimen.imageSpace);
             Paint paint = setUpPaint(c);
 
+
+
             ySize = ySize + initialPadding;
             ySize = ySize + padding;
+
+            if(toDrawSettings)
+            {
+                DisplayMetrics displayMetrics = getApplicationContext().getResources().getDisplayMetrics();
+                float dpHeight = displayMetrics.heightPixels;
+                float dpWidth = displayMetrics.widthPixels;
+                Log.d(TAG,"dpHeight"+dpHeight);
+                Log.d(TAG,"dpWidth"+dpWidth);
+                int settingsFontSize = (int)(dpWidth*0.2);
+                paint.setTextSize(settingsFontSize);
+                ySize = ySize + settingsFontSize;
+                c.drawText("ⓢ", (float)(dpWidth*0.8), ySize, paint);
+                ySize = ySize - settingsFontSize;
+            }
+
+
 
             if (mShowTime) {
                 ySize = drawTime(c, paint, ySize, padding);
@@ -498,11 +610,13 @@ public class ClockService extends WallpaperService implements
             }
             if (mShowLocation) {
 
-                if(!isOnTouchEventCompleted) {
+                if (!isOnTouchEventCompleted) {
                     if (isLocationWeatherDataSetUp) {
                         ySize = drawLocation(c, paint, ySize, padding);
 
                         drawTemperatureAndWeather(c, paint, ySize, padding, imageSpace);
+                        isEverythingDisplayed = true;
+
                     } else {
                         drawProgress(c, ySize, padding, paint);
 
@@ -510,12 +624,22 @@ public class ClockService extends WallpaperService implements
                 }
 
 
+            } else {
+                isEverythingDisplayed = true;
             }
+            if (isEverythingDisplayed && locationRequestTime == 0) {
+                locationRequestTime = SystemClock.elapsedRealtime();
+            }
+
+
             c.restore();
-            if (!isOnTouchEventCompleted&&SystemClock.elapsedRealtime() - locationRequestTime > 10000) {
-                removeLocationUpadtesAndDisconnect();
-                isLocationWeatherDataSetUp=false;
-                isOnTouchEventCompleted=true;
+            //Log.d(TAG,"isEverythingDisplayed"+isEverythingDisplayed+(SystemClock.elapsedRealtime() - locationRequestTime));
+            if (mShowLocation && isEverythingDisplayed && SystemClock.elapsedRealtime() - locationRequestTime > 10000) {
+                //removeLocationUpadtesAndDisconnect();
+                isLocationWeatherDataSetUp = false;
+                isOnTouchEventCompleted = true;
+                isOnTouchEventStarted = false;
+                toDrawSettings=false;
 
             }
         }
@@ -530,24 +654,24 @@ public class ClockService extends WallpaperService implements
 
         @NonNull
         private Paint setUpPaint(Canvas c) {
-            Log.d(TAG,"color code "+mColorCode);
-            Log.d(TAG,"color code text "+mColorCodeText);
+            //Log.d(TAG,"color code "+mColorCode);
+            //Log.d(TAG,"color code text "+mColorCodeText);
             Paint paint = new Paint();
-//            if (mColorCode == null || "Default".equals(mColorCode) || "D".equalsIgnoreCase(mColorCode)) {
-//                paint.setColor(Color.rgb(255, 160, 122));
-//            } else {
-//                paint.setColor(Color.parseColor(mColorCode));
-//            }
             paint.setColor(mColorCode);
             paint.setStyle(Paint.Style.FILL);
 
             c.drawPaint(paint);
 
-//            if (mColorCodeText == null || "Default".equals(mColorCodeText) || "D".equalsIgnoreCase(mColorCodeText)) {
-//                paint.setColor(Color.WHITE);
-//            } else {
-//                paint.setColor(Color.parseColor(mColorCodeText));
-//            }
+//            WallpaperManager wallpaperManager=WallpaperManager.getInstance(getApplicationContext());
+//           // Resources res = getResources();
+//            //Bitmap bm = BitmapFactory.decodeFile(wallpaperManager.getWallpaperInfo().);
+//            //c.drawBitmap(bm, 0, 0, null);
+//            Log.d(TAG,wallpaperManager.getWallpaperInfo().getPackageName());
+//            Log.d(TAG,wallpaperManager.getWallpaperInfo().describeContents()+"");
+//            Log.d(TAG,wallpaperManager.getWallpaperInfo().getServiceName());
+//            Log.d(TAG,wallpaperManager.getWallpaperInfo().getComponent().flattenToString());
+//            Log.d(TAG,wallpaperManager.getWallpaperInfo().getServiceInfo().toString());
+
 
             paint.setColor(mColorCodeText);
 
@@ -569,37 +693,42 @@ public class ClockService extends WallpaperService implements
 
             Request request = new Request.Builder().url("http://api.met.no/weatherapi/locationforecastlts/1.2/?lat=" + latitude + ";lon=" + longitude).build();
             if (isNetworkAvailable()) {
-                if (call == null ) {
+                if (call == null) {
 
-                        call = okHttpClient.newCall(request);
-                        call.enqueue(new Callback() {
-                            @Override
-                            public void onFailure(Call call, IOException e) {
-                                Toast.makeText(getApplicationContext(), "There was an error. Please try again", Toast.LENGTH_LONG).show();
+                    call = okHttpClient.newCall(request);
+                    call.enqueue(new Callback() {
+                        @Override
+                        public void onFailure(Call call, IOException e) {
+                            Toast.makeText(getApplicationContext(), "There was an error. Please try again", Toast.LENGTH_LONG).show();
+                        }
+
+                        @Override
+                        public void onResponse(Call call, Response response) throws IOException {
+                            if (response.isSuccessful()) {
+
+                                jsonResponse = response.body().string();
+                                //Log.d(TAG,"jsonResponse"+jsonResponse);
+                                //System.out.println(jsonResponse);
+                                locationWeatherDisplayed = true;
+
+                                response.body().close();
+
+
+                                getTemperatureAndSymbol();
+
+
                             }
 
-                            @Override
-                            public void onResponse(Call call, Response response) throws IOException {
-                                if (response.isSuccessful()) {
-
-                                    jsonResponse = response.body().string();
-                                    locationWeatherDisplayed = true;
-
-
-
-                                    getTemperatureAndSymbol();
-
-
-                                }
-
-                            }
-                        });
+                        }
+                    });
 
                 }
 
 
-                    drawTemperatureWeatherOnCanvas(c, paint, ySize, padding, imageSpace);
+                if (temperatureObtained && symbolObtained && humidityObtained&&nextHourSymbolObtained) {
 
+                    drawTemperatureWeatherOnCanvas(c, paint, ySize, padding, imageSpace);
+                }
 
 
             } else {
@@ -608,19 +737,7 @@ public class ClockService extends WallpaperService implements
         }
 
         private void drawTemperatureWeatherOnCanvas(Canvas c, Paint paint, int ySize, int padding, int imageSpace) {
-            int temperatureFontSize = getResources().getDimensionPixelSize(R.dimen.temperatureFontSize);
-            ySize = ySize + temperatureFontSize;
-            paint.setTextSize(temperatureFontSize);
-
-            double tempCelsius = Double.parseDouble(temperature);
-            double tempFahrenheit = tempCelsius + 32;
-
-
-            c.drawText(tempFahrenheit + "° F( " + tempCelsius + " ° C )", 0, ySize, paint);
-
-
             int weatherFontSize = getResources().getDimensionPixelSize(R.dimen.weatherFontSize);
-
             ySize = ySize + padding;
             int imageId = -1;
             Calendar calendar = Calendar.getInstance();
@@ -634,7 +751,8 @@ public class ClockService extends WallpaperService implements
             Bitmap icon = BitmapFactory.decodeResource(getResources(), imageId);
             c.drawBitmap(icon, 0, ySize, paint);
             paint.setTextSize(weatherFontSize);
-            ySize = ySize + padding;
+
+            ySize = ySize + weatherFontSize;
             String weatherText = "";
             if (hour > 19) {
                 weatherText = weatherdata.getTextMapForNight().get(symbolText);
@@ -642,13 +760,83 @@ public class ClockService extends WallpaperService implements
                 weatherText = weatherdata.getTextMap().get(symbolText);
             }
 
+            int startPoint = 0;
+            int count = 0;
+            while (true) {
+                if (weatherText.length() < 36) {
+                    c.drawText(weatherText, imageSpace, ySize, paint);
+                    count++;
+                    break;
+                }
+                c.drawText(weatherText.substring(0, 36), imageSpace, ySize, paint);
+                weatherText = weatherText.substring(36);
+                ySize = ySize + padding + weatherFontSize;
+                count++;
+
+
+            }
+            if (count == 1) {
+                ySize = ySize + padding;
+            }
+
 
             int paddingForStaticLayout = getResources().getDimensionPixelSize(R.dimen.paddingForStaticLayout);
             int lengthForStaticLayout = getResources().getDimensionPixelSize(R.dimen.lengthForStaticLayout);
 
-            StaticLayout layout = new StaticLayout(weatherText, new TextPaint(paint), lengthForStaticLayout, Layout.Alignment.ALIGN_NORMAL, paddingForStaticLayout, 0, false);
-            c.translate(imageSpace, ySize); //position the text
-            layout.draw(c);
+            //StaticLayout layout = new StaticLayout(weatherText, new TextPaint(paint), lengthForStaticLayout, Layout.Alignment.ALIGN_NORMAL, paddingForStaticLayout, 0, false);
+            //c.translate(imageSpace, ySize); //position the text
+            //layout.draw(c);
+            ySize = ySize + padding;
+            int temperatureFontSize = getResources().getDimensionPixelSize(R.dimen.temperatureFontSize);
+            ySize = ySize + temperatureFontSize;
+            paint.setTextSize(temperatureFontSize);
+
+            double tempCelsius = Double.parseDouble(temperature);
+            double tempFahrenheit = tempCelsius + 32;
+
+
+            c.drawText("Temperature : " + tempFahrenheit + "° F( " + tempCelsius + " ° C )", 0, ySize, paint);
+            ySize = ySize + padding;
+            ySize = ySize + temperatureFontSize;
+            c.drawText("Humidity : " + humidity + "%", 0, ySize, paint);
+            ySize = ySize + padding;
+            ySize = ySize + temperatureFontSize;
+            c.drawText("Next hour : ", 0, ySize, paint);
+            if (hour > 19) {
+                imageId = weatherdata.getImageIdsForNight()[Integer.parseInt(nextHourSymbolNumber) - 1];
+            } else {
+                imageId = weatherdata.getImageIds()[Integer.parseInt(nextHourSymbolNumber) - 1];
+            }
+
+            icon = BitmapFactory.decodeResource(getResources(), imageId);
+            Log.d(TAG,"imageId"+imageId);
+            c.drawBitmap(icon, imageSpace+imageSpace/2, ySize-imageSpace/2, paint);
+
+            weatherText = "";
+            if (hour > 19) {
+                weatherText = weatherdata.getTextMapForNight().get(nextHourSymbolText);
+            } else {
+                weatherText = weatherdata.getTextMap().get(nextHourSymbolText);
+            }
+
+            startPoint = 0;
+            count = 0;
+            while (true) {
+                if (weatherText.length() < 36) {
+                    c.drawText(weatherText, imageSpace+imageSpace/2+imageSpace, ySize, paint);
+                    count++;
+                    break;
+                }
+                c.drawText(weatherText.substring(0, 36), imageSpace+imageSpace/2+imageSpace, ySize, paint);
+                weatherText = weatherText.substring(36);
+                ySize = ySize + padding + weatherFontSize;
+                count++;
+
+
+            }
+
+
+
         }
 
         private int drawLocation(Canvas c, Paint paint, int ySize, int padding) {
@@ -679,7 +867,6 @@ public class ClockService extends WallpaperService implements
                     }
 
                 }
-
 
 
             }
@@ -717,9 +904,6 @@ public class ClockService extends WallpaperService implements
         }
 
 
-
-
-
         private void skip(XmlPullParser parser) throws XmlPullParserException, IOException {
             if (parser.getEventType() != XmlPullParser.START_TAG) {
                 throw new IllegalStateException();
@@ -752,22 +936,22 @@ public class ClockService extends WallpaperService implements
         @Override
         public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String s) {
 
-            Log.d(TAG,sharedPreferences.getAll().toString());
-            int colorCode = sharedPreferences.getInt("color_code",0xffffa07a);
+            //Log.d(TAG,sharedPreferences.getAll().toString());
+            int colorCode = sharedPreferences.getInt("color_code", 0xffffa07a);
             mColorCode = colorCode;
             int colorCodeText = sharedPreferences.getInt("color_code_text", 0xffffffff);
             mColorCodeText = colorCodeText;
             mShowDate = sharedPreferences.getBoolean("show_date", true);
             mShowTime = sharedPreferences.getBoolean("show_time", true);
             mShowDay = sharedPreferences.getBoolean("show_day", true);
-            mShowLocation=sharedPreferences.getBoolean("show_location",true);
+            mShowLocation = sharedPreferences.getBoolean("show_location", true);
 
 
         }
     }
 
     private void startSettings() {
-        Intent intent=new Intent(this,ClockServiceSettings.class);
+        Intent intent = new Intent(this, ClockServiceSettings.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
     }
