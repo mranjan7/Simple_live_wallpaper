@@ -28,6 +28,7 @@
         android:defaultValue="true"
         android:summary="@string/show_location_summary"
         android:key="show_location" />
+    <EditTextPreference />
 
 
 </PreferenceScreen>
