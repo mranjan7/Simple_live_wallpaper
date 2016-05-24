@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="ForecastIOLib-1.5.1">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.github.dvdme/ForecastIOLib/1.5.1/a6119da3d418105d4f4bd56881970780a10ce79b/ForecastIOLib-1.5.1.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.github.dvdme/ForecastIOLib/1.5.1/c03411183add6d530a7bcdd5f9249e59eee17f1/ForecastIOLib-1.5.1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
