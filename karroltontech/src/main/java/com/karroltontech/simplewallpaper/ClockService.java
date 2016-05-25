@@ -269,7 +269,7 @@ public class ClockService extends WallpaperService implements
                             int tempToHour=Integer.parseInt(toHourSt);
                             Log.d(TAG, "tempFromHour " + tempFromHour);
                             Log.d(TAG, "tempToHour " + tempToHour);
-                            if(hour!=-1&&hour<23&&tempFromHour==hour+1&&tempToHour==hour+1)
+                            if(hour!=-1&&hour<23&&tempToHour>hour)
                             {
                                 isNextHourTime=true;
                             }
