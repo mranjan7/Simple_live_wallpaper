@@ -15,6 +15,10 @@ public class Weatherdata {
 
 
 
+    public HashMap<Integer,String> windBeufortMap=new HashMap<Integer, String>();
+
+
+
     public Weatherdata()
     {
 
@@ -210,6 +214,21 @@ public class Weatherdata {
         imageIdsForNight[48]=R.drawable.img_49_1;
         imageIdsForNight[49]=R.drawable.img_50_1;
 
+        windBeufortMap.put(0,"Calm");
+        windBeufortMap.put(1,"Light air");
+        windBeufortMap.put(2,"Light breeze");
+        windBeufortMap.put(3,"Gentle breeze");
+        windBeufortMap.put(4,"Moderate breeze");
+        windBeufortMap.put(5,"Fresh breeze");
+        windBeufortMap.put(6,"Strong breeze");
+        windBeufortMap.put(7,"High wind,moderate gale");
+        windBeufortMap.put(8,"Gale");
+        windBeufortMap.put(9,"Strong gale");
+        windBeufortMap.put(10,"Storm,whole gale");
+        windBeufortMap.put(11,"Violent storm");
+        windBeufortMap.put(12,"Hurricane force");
+
+
 
     }
     public HashMap<String, String> getTextMap() {
@@ -241,6 +260,9 @@ public class Weatherdata {
 
     public void setImageIdsForNight(int[] imageIdsForNight) {
         this.imageIdsForNight = imageIdsForNight;
+    }
+    public HashMap<Integer, String> getWindBeufortMap() {
+        return windBeufortMap;
     }
 
 }
