@@ -1,12 +1,10 @@
 package com.karroltontech.simplewallpaper;
 
 import android.Manifest;
-import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -22,8 +20,6 @@ import android.os.SystemClock;
 import android.service.wallpaper.WallpaperService;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
-import android.text.Layout;
-import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -87,14 +83,26 @@ public class ClockService extends WallpaperService implements
     private String temperature;
     private String symbolNumber;
     private String humidity;
+    private String precipitationValue;
+    private String precipitationUnit;
+    private String windMps;
+    private int windBeaufort=-1;
+    private String windDirectionDeg;
+    private String windDirectionName;
     boolean temperatureObtained = false;
     boolean symbolObtained = false;
     boolean humidityObtained = false;
+    boolean precipitationObtained=false;
+    boolean windSpeedObtained =false;
+    boolean windDirectionObtained=false;
     private int[] imageIds;
     private String symbolText;
     private String nextHourSymbolText;
     private String nextHourSymbolNumber;
     private boolean nextHourSymbolObtained;
+    private String afterFourHourSymbolNumber;
+    private String afterFourHourSymbolText;
+    private boolean afterFourHourSymbolObtained;
     private Weatherdata weatherdata;
     private boolean locationWeatherDisplayed;
     private boolean mShowLocation;
@@ -244,7 +252,7 @@ public class ClockService extends WallpaperService implements
             boolean hourlyWeatherObtained = false;
             boolean dailyWeatherObtained = false;
             boolean isNextHourTime=false;
-            boolean isTomorrowTime=false;
+            boolean isAfterFourHourTime=false;
 
             outer:
             while (event != XmlPullParser.END_DOCUMENT) {
@@ -269,9 +277,17 @@ public class ClockService extends WallpaperService implements
                             int tempToHour=Integer.parseInt(toHourSt);
                             Log.d(TAG, "tempFromHour " + tempFromHour);
                             Log.d(TAG, "tempToHour " + tempToHour);
-                            if(hour!=-1&&hour<23&&tempToHour>hour)
+                            if(hour!=-1&&tempToHour<hour)
+                            {
+                                tempToHour=tempToHour+23;
+                            }
+                            if(hour!=-1&&tempToHour-hour>1&&!nextHourSymbolObtained)
                             {
                                 isNextHourTime=true;
+                            }
+                            if(hour!=-1&&tempToHour-hour>4&&!afterFourHourSymbolObtained)
+                            {
+                                isAfterFourHourTime=true;
                             }
 
 
@@ -322,6 +338,16 @@ public class ClockService extends WallpaperService implements
                                 }
                                 isNextHourTime=false;
                             }
+                            else if(isAfterFourHourTime)
+                            {
+                                afterFourHourSymbolNumber=xmlPullParser.getAttributeValue(null, "number");
+                                afterFourHourSymbolText=xmlPullParser.getAttributeValue(null, "id");
+                                if(afterFourHourSymbolText!=null&&afterFourHourSymbolNumber!=null)
+                                {
+                                    afterFourHourSymbolObtained=true;
+                                }
+                                isAfterFourHourTime=false;
+                            }
 
                         } else if (name.equals("humidity")) {
 
@@ -332,11 +358,46 @@ public class ClockService extends WallpaperService implements
 
                             }
 
+                        } else if (name.equals("precipitation")) {
+
+                            precipitationValue = xmlPullParser.getAttributeValue(null, "value");
+                            precipitationUnit=xmlPullParser.getAttributeValue(null,"unit");
+
+                            if (precipitationValue != null&&precipitationUnit!=null) {
+                                precipitationObtained = true;
+
+                            }
+
+                        }else if (name.equals("windSpeed")) {
+
+                            windMps = xmlPullParser.getAttributeValue(null, "mps");
+                            String windBeaufortStr=xmlPullParser.getAttributeValue(null, "beaufort");
+                            Log.d(TAG,"windMps "+windMps+" windBeaufortStr "+windBeaufortStr);
+                            if(windBeaufortStr!=null) {
+                                windBeaufort = Integer.parseInt(windBeaufortStr);
+                            }
+
+                            if (windMps != null&&windBeaufort!=-1) {
+                                windSpeedObtained = true;
+
+                            }
+
+                        } else if (name.equals("windDirection")) {
+
+                            windDirectionDeg = xmlPullParser.getAttributeValue(null, "deg");
+                            windDirectionName=xmlPullParser.getAttributeValue(null, "name");;
+
+                            if (windDirectionDeg != null&&windDirectionName!=null) {
+                                windDirectionObtained = true;
+
+                            }
+
                         }
+
                         break;
 
                 }
-                if (temperatureObtained && symbolObtained && humidityObtained &&nextHourSymbolObtained) {
+                if (temperatureObtained && symbolObtained && humidityObtained &&nextHourSymbolObtained&&precipitationObtained&&windSpeedObtained&&windDirectionObtained&&afterFourHourSymbolObtained) {
                     Log.d(TAG, "nextHourSymbol " + nextHourSymbolNumber);
                     break outer;
                 }
@@ -584,16 +645,7 @@ public class ClockService extends WallpaperService implements
 
             if(toDrawSettings)
             {
-                DisplayMetrics displayMetrics = getApplicationContext().getResources().getDisplayMetrics();
-                float dpHeight = displayMetrics.heightPixels;
-                float dpWidth = displayMetrics.widthPixels;
-                Log.d(TAG,"dpHeight"+dpHeight);
-                Log.d(TAG,"dpWidth"+dpWidth);
-                int settingsFontSize = (int)(dpWidth*0.2);
-                paint.setTextSize(settingsFontSize);
-                ySize = ySize + settingsFontSize;
-                c.drawText("ⓢ", (float)(dpWidth*0.8), ySize, paint);
-                ySize = ySize - settingsFontSize;
+                //ySize = drawSidebar(c, ySize, paint);
             }
 
 
@@ -605,14 +657,18 @@ public class ClockService extends WallpaperService implements
                 ySize = drawDay(c, paint, ySize, padding);
             }
             if (mShowDate) {
-                ySize = drawDate(c, paint, ySize, padding);
+                //ySize = drawDate(c, paint, ySize, padding);
 
             }
+
+
             if (mShowLocation) {
 
                 if (!isOnTouchEventCompleted) {
                     if (isLocationWeatherDataSetUp) {
+
                         ySize = drawLocation(c, paint, ySize, padding);
+
 
                         drawTemperatureAndWeather(c, paint, ySize, padding, imageSpace);
                         isEverythingDisplayed = true;
@@ -642,6 +698,31 @@ public class ClockService extends WallpaperService implements
                 toDrawSettings=false;
 
             }
+        }
+
+        private int drawSidebar(Canvas c, int ySize, Paint paint) {
+            DisplayMetrics displayMetrics = getApplicationContext().getResources().getDisplayMetrics();
+            float dpHeight = displayMetrics.heightPixels;
+            float dpWidth = displayMetrics.widthPixels;
+            Log.d(TAG,"dpHeight"+dpHeight);
+            Log.d(TAG,"dpWidth"+dpWidth);
+            int settingsFontSize = (int)(dpWidth*0.2);
+            paint.setTextSize(settingsFontSize);
+            ySize = ySize + settingsFontSize;
+            c.drawText("ⓢ", (float)(dpWidth*0.8), ySize, paint);
+            ySize = ySize - settingsFontSize;
+            return ySize;
+        }
+
+        private int drawLine(Canvas c, int ySize, Paint paint) {
+            int lineFontSize = getResources().getDimensionPixelSize(R.dimen.lineFontSize);
+            int linePadding = getResources().getDimensionPixelSize(R.dimen.linePadding);
+            paint.setTextSize(lineFontSize);
+            ySize = ySize + linePadding;
+            c.drawText("----------------------------------------", 0, ySize, paint);
+            ySize = ySize + linePadding;
+
+            return ySize;
         }
 
         private void drawProgress(Canvas c, int ySize, int padding, Paint paint) {
@@ -742,6 +823,7 @@ public class ClockService extends WallpaperService implements
             int imageId = -1;
             Calendar calendar = Calendar.getInstance();
             int hour = calendar.get(Calendar.HOUR_OF_DAY);
+            Log.d(TAG,"hour "+hour);
             if (hour > 19) {
                 imageId = weatherdata.getImageIdsForNight()[Integer.parseInt(symbolNumber) - 1];
             } else {
@@ -787,6 +869,7 @@ public class ClockService extends WallpaperService implements
             //c.translate(imageSpace, ySize); //position the text
             //layout.draw(c);
             ySize = ySize + padding;
+            ySize = ySize + padding;
             int temperatureFontSize = getResources().getDimensionPixelSize(R.dimen.temperatureFontSize);
             ySize = ySize + temperatureFontSize;
             paint.setTextSize(temperatureFontSize);
@@ -801,8 +884,19 @@ public class ClockService extends WallpaperService implements
             c.drawText("Humidity : " + humidity + "%", 0, ySize, paint);
             ySize = ySize + padding;
             ySize = ySize + temperatureFontSize;
-            c.drawText("Next hour : ", 0, ySize, paint);
-            if (hour > 19) {
+            c.drawText("Precipitation : " + precipitationValue + " "+precipitationUnit, 0, ySize, paint);
+            ySize = ySize + padding;
+            ySize = ySize + temperatureFontSize;
+            c.drawText("Wind : " + weatherdata.getWindBeufortMap().get(windBeaufort) + " "+windMps+" m/s "+windDirectionDeg+"° "+windDirectionName, 0, ySize, paint);
+            ySize = ySize + padding;
+            ySize = ySize + temperatureFontSize;
+
+            drawLine(c, paint, ySize);
+            ySize = ySize + padding;
+            ySize = ySize + temperatureFontSize;
+            c.drawText("After 1 hour : ", 0, ySize, paint);
+
+            if ((hour+1)%24 > 18||(hour+1)%24<6) {
                 imageId = weatherdata.getImageIdsForNight()[Integer.parseInt(nextHourSymbolNumber) - 1];
             } else {
                 imageId = weatherdata.getImageIds()[Integer.parseInt(nextHourSymbolNumber) - 1];
@@ -810,10 +904,12 @@ public class ClockService extends WallpaperService implements
 
             icon = BitmapFactory.decodeResource(getResources(), imageId);
             Log.d(TAG,"imageId"+imageId);
-            c.drawBitmap(icon, imageSpace+imageSpace/2, ySize-imageSpace/2, paint);
+            c.drawBitmap(icon, 0, ySize-padding, paint);
+            ySize = ySize + padding;
+            ySize = ySize + temperatureFontSize;
 
             weatherText = "";
-            if (hour > 19) {
+            if ((hour+1)%24>18||(hour+1)%24<6) {
                 weatherText = weatherdata.getTextMapForNight().get(nextHourSymbolText);
             } else {
                 weatherText = weatherdata.getTextMap().get(nextHourSymbolText);
@@ -823,11 +919,53 @@ public class ClockService extends WallpaperService implements
             count = 0;
             while (true) {
                 if (weatherText.length() < 36) {
-                    c.drawText(weatherText, imageSpace+imageSpace/2+imageSpace, ySize, paint);
+                    c.drawText(weatherText, imageSpace, ySize, paint);
                     count++;
                     break;
                 }
-                c.drawText(weatherText.substring(0, 36), imageSpace+imageSpace/2+imageSpace, ySize, paint);
+                c.drawText(weatherText.substring(0, 36), imageSpace, ySize, paint);
+                weatherText = weatherText.substring(36);
+                ySize = ySize + padding + weatherFontSize;
+                count++;
+
+
+            }
+            ySize = ySize + padding;
+            ySize = ySize + temperatureFontSize;
+
+            drawLine(c, paint, ySize);
+            ySize = ySize + padding;
+            ySize = ySize + temperatureFontSize;
+            c.drawText("After 4 hour : ", 0, ySize, paint);
+
+            if ((hour+4)%24 > 18||(hour+4)%24<6) {
+                imageId = weatherdata.getImageIdsForNight()[Integer.parseInt(afterFourHourSymbolNumber) - 1];
+            } else {
+                imageId = weatherdata.getImageIds()[Integer.parseInt(afterFourHourSymbolNumber) - 1];
+            }
+
+            icon = BitmapFactory.decodeResource(getResources(), imageId);
+            Log.d(TAG,"imageId"+imageId);
+            c.drawBitmap(icon, 0, ySize-padding, paint);
+            ySize = ySize + padding;
+            ySize = ySize + temperatureFontSize;
+
+            weatherText = "";
+            if ((hour+4)%24 > 18||(hour+4)%24<6) {
+                weatherText = weatherdata.getTextMapForNight().get(afterFourHourSymbolText);
+            } else {
+                weatherText = weatherdata.getTextMap().get(afterFourHourSymbolText);
+            }
+
+            startPoint = 0;
+            count = 0;
+            while (true) {
+                if (weatherText.length() < 36) {
+                    c.drawText(weatherText, imageSpace, ySize, paint);
+                    count++;
+                    break;
+                }
+                c.drawText(weatherText.substring(0, 36), imageSpace, ySize, paint);
                 weatherText = weatherText.substring(36);
                 ySize = ySize + padding + weatherFontSize;
                 count++;
@@ -839,12 +977,26 @@ public class ClockService extends WallpaperService implements
 
         }
 
+        private void drawLine(Canvas c, Paint paint, int ySize) {
+            c.drawText("------------------------------------------------------------------", 0, ySize, paint);
+        }
+
         private int drawLocation(Canvas c, Paint paint, int ySize, int padding) {
 
             int locationFontSize = getResources().getDimensionPixelSize(R.dimen.locationFontSize);
-            paint.setTextSize(locationFontSize);
-            ySize = ySize + locationFontSize;
+            int lineFontSize = getResources().getDimensionPixelSize(R.dimen.lineFontSize);
+            int linePadding = getResources().getDimensionPixelSize(R.dimen.linePadding);
             ySize = ySize + padding;
+            paint.setTextSize(lineFontSize);
+
+            drawLine(c, paint, ySize);
+
+            ySize = ySize + linePadding;
+
+            paint.setTextSize(locationFontSize);
+
+            ySize = ySize + locationFontSize;
+
             if (mAddresses != null && mAddresses.size() != 0) {
 
                 int maxAddressLineIndex = mAddresses.get(0).getMaxAddressLineIndex();
@@ -870,6 +1022,12 @@ public class ClockService extends WallpaperService implements
 
 
             }
+            ySize = ySize + linePadding;
+            ySize = ySize + lineFontSize;
+            paint.setTextSize(lineFontSize);
+
+            drawLine(c, paint, ySize);
+
             return ySize;
         }
 
@@ -886,9 +1044,10 @@ public class ClockService extends WallpaperService implements
         private int drawDay(Canvas c, Paint paint, int ySize, int padding) {
             int dayFontSize = getResources().getDimensionPixelSize(R.dimen.dayFontSize);
             SimpleDateFormat dayFormat = new SimpleDateFormat("EEEE");
+            DateFormat dateFormat = DateFormat.getDateInstance();
             paint.setTextSize(dayFontSize);
             ySize = ySize + dayFontSize;
-            c.drawText(dayFormat.format(new Date()), 0, ySize, paint);
+            c.drawText(dayFormat.format(new Date())+","+dateFormat.format(new Date()), 0, ySize, paint);
             ySize = ySize + padding;
             return ySize;
         }

@@ -2,8 +2,10 @@
 <resources>
     <dimen name="initialPadding">25sp</dimen>
     <dimen name="padding">5sp</dimen>
+    <dimen name="linePadding">2sp</dimen>
+    <dimen name="lineFontSize">15sp</dimen>
     <dimen name="timeFontSize">65sp</dimen>
-    <dimen name="dayFontSize">40sp</dimen>
+    <dimen name="dayFontSize">20sp</dimen>
     <dimen name="dateFontSize">40sp</dimen>
     <dimen name="locationFontSize">15sp</dimen>
     <dimen name="temperatureFontSize">15sp</dimen>
